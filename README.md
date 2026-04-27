@@ -1,18 +1,24 @@
 # Snowball Fight: AI vs AI Game Simulation
 
-A Python-based AI vs AI competitive game inspired by the classic Java-based button phone game "Snowball Fight". Two autonomous AI agents battle each other using different decision-making algorithms.
+A Python-based AI vs AI competitive game inspired by the classic Java-based button phone game "Snowball Fight". Two autonomous AI agents battle each other **simultaneously** using different decision-making algorithms.
 
 ## Project Overview
 
 This project implements a two-player AI vs AI snowball fighting game where:
 - **Player 1** uses the **Minimax algorithm** with Alpha-Beta pruning for optimal decision-making
 - **Player 2** uses the **Monte Carlo Tree Search (MCTS)** algorithm for exploration-based decision-making
+- **Both agents act simultaneously** without turn alternation
+- **Attack cooldown system**: 2-step cooldown (≈2 seconds) between consecutive attacks
+- **Free movement**: Agents can move at any time without cooldown
 
 ### Game Features
 
-- **2D Turn-based Gameplay**: Players alternate turns on a fixed 2D field
+- **Simultaneous Gameplay**: Both players act at the same time, not alternating turns
+- **Attack Cooldown**: 2-step cooldown between attacks (prevents spam)
+- **Free Movement**: Move anytime without cooldown restriction
 - **Actions Available**:
-  - Move Left/Right/Forward/Backward
+  - Move Left/Right (horizontal positioning)
+  - Move Forward/Backward (1 block max, vertical movement)
   - Aim for better accuracy
   - Throw Snowball
   - Use Special Items (MedKit for healing, Freezeball for effects)
@@ -71,40 +77,75 @@ pip install pygame numpy
 
 ## Running the Game
 
-### Method 1: Using the Menu System (Recommended)
+### Visual GUI Game (Default)
 ```bash
-python main.py
+python play.py
 ```
 
-This opens an interactive menu where you can:
-1. Play GUI Game (Minimax vs MCTS with visual display)
-2. Play Console Game (Text-based output)
-3. Run Multiple Matches & Statistics
-4. Custom Match (Choose your own agent combinations)
-5. Exit
+This starts the **visual game** with animated sprites, real-time action display, and simultaneous gameplay where both agents act at the same time. Use SPACE to pause, UP/DOWN to adjust speed, Q to quit.
 
-### Method 2: Direct Console Game
+### Console Output (Text-Based Alternative)
 ```bash
 cd src
 python game.py
 ```
 
-### Method 3: Direct GUI Game
+This runs a text-based version showing all actions and cooldowns in console.
+
+### Using the Menu System
 ```bash
-cd src
-python gui.py
+python main.py
 ```
 
-## Game Controls (GUI Mode)
+This opens an interactive menu where you can choose different game modes and configurations.
 
-| Key | Action |
-|-----|--------|
-| SPACE | Pause/Resume |
-| UP | Increase game speed |
-| DOWN | Decrease game speed |
-| Q | Quit game |
+## Simultaneous Gameplay System
+
+### How It Works
+
+Instead of alternating turns, both agents **decide and execute actions at the same time**:
+
+```
+Step 1:
+  P1 decides → THROW_SNOWBALL
+  P2 decides → MOVE_LEFT
+  
+  Both actions execute simultaneously!
+  P1 attacks while P2 moves to dodge
+
+Step 2:
+  P1 cannot attack (2-step cooldown active = 1 step remaining)
+  P2 can attack
+  
+  P1 defaults to AIM (waiting for cooldown)
+  P2 can throw snowball
+
+Step 3:
+  P1 cooldown expired → can attack again
+  P2 on cooldown
+```
+
+### Attack Cooldown
+
+- **Duration**: 2 steps (approximately 2 seconds)
+- **Triggered by**: THROW_SNOWBALL or USE_FREEZEBALL actions
+- **Effect**: Prevents attacking until cooldown expires
+- **During cooldown**: Agent defaults to AIM action or movement
+
+### Movement
+
+- **No cooldown**: Agents can move every step
+- **Directions**: LEFT, RIGHT, FORWARD (toward opponent), BACKWARD (away)
+- **Limits**: Maximum 1 block per direction
+- **Purpose**: Dodge incoming attacks or position for better aim
+
+## Game Controls (Console)
+
+The console displays all agents' actions with timestamps and cooldown status.
 
 ## Algorithm Implementations
+
+Both algorithms work identically in the simultaneous gameplay system, with the addition of attack cooldown constraints.
 
 ### Minimax Algorithm (Player 1)
 
@@ -113,6 +154,7 @@ python gui.py
 - Uses Alpha-Beta pruning to eliminate unnecessary branches
 - Evaluates positions based on heuristics
 - Optimal decision-making for zero-sum games
+- **In simultaneous mode**: Respects 2-step attack cooldown
 
 **Heuristic Evaluation:**
 - Health advantage (our HP - opponent HP) × 10
@@ -122,7 +164,7 @@ python gui.py
 
 **Configuration:**
 - Search depth: 2-3 (adjustable)
-- Time complexity: O(b^d) where b=branching factor, d=depth
+- Attack cooldown: 2 steps between attacks
 
 ### Monte Carlo Tree Search (Player 2)
 
@@ -131,6 +173,7 @@ python gui.py
 - Balances exploration and exploitation with UCB1 formula
 - Does not require explicit game tree evaluation
 - Adaptive to complex game states
+- **In simultaneous mode**: Respects 2-step attack cooldown
 
 **Algorithm Phases:**
 1. **Selection**: Use UCB1 to select most promising path
@@ -146,21 +189,36 @@ UCB1 = Exploitation + Exploration
 
 **Configuration:**
 - Simulations per turn: 300-500 (adjustable)
-- Exploration constant: 1.41 (sqrt(2))
+- Attack cooldown: 2 steps between attacks
 
 ## Game Statistics
 
-Sample match statistics (Minimax vs MCTS):
-- **Average turns per game**: 15-30
-- **Win rate (Minimax)**: ~55-60%
-- **Win rate (MCTS)**: ~40-45%
+Sample match statistics (Minimax vs MCTS with simultaneous gameplay):
+- **Average steps per game**: 100-200 (more steps due to simultaneous execution)
 - **Average game duration**: 2-5 seconds
+- **Win rate (Minimax)**: ~50-60% (depending on AI parameters)
+- **Win rate (MCTS)**: ~40-50% (depending on AI parameters)
+
+**Note:** Games have more steps than turn-based versions because agents act simultaneously and must respect attack cooldowns, resulting in strategic waiting periods where they move or aim instead of attacking.
 
 ## Customization
 
+### Adjusting Attack Cooldown
+
+Edit `src/game_state.py` and search for where cooldowns are set (around lines 189, 217):
+```python
+# Change this value to adjust cooldown duration (in steps)
+self.player1_attack_cooldown = 2  # 2 steps = ~2 seconds
+self.player2_attack_cooldown = 2
+```
+
+- `2` = Normal cooldown (~2 seconds between attacks)
+- `1` = Faster attacks (less waiting)
+- `3` = Slower attacks (more strategic)
+
 ### Adjusting AI Difficulty
 
-Edit `src/game.py` or `src/gui.py`:
+Edit `src/game.py` or `src/game_state.py`:
 
 ```python
 # For Minimax
@@ -178,18 +236,19 @@ Edit `src/game_state.py`:
 FIELD_WIDTH = 10          # Game field width
 FIELD_HEIGHT = 5          # Game field height
 INITIAL_HP = 100          # Starting health points
-MAX_TURNS = 200           # Maximum turns before draw
+MAX_TURNS = 200           # Maximum steps before draw
 HIT_DAMAGE = 20           # Damage per successful hit
 ```
 
 ## Key Features
 
+✅ **Simultaneous Gameplay**: Both agents act at the same time without turn alternation
+✅ **Attack Cooldown System**: 2-step cooldown between attacks prevents spam
+✅ **Free Movement**: Move at any time without cooldown restrictions
 ✅ **Two Different AI Algorithms**: Compare Minimax vs MCTS strategies
-✅ **Visual GUI**: Watch agents battle in real-time with pygame
-✅ **Detailed Logging**: Console output shows all actions and decisions
-✅ **Batch Testing**: Run multiple matches and collect statistics
-✅ **Configurable**: Adjust AI difficulty and game parameters
-✅ **Educational**: Great for learning about game AI algorithms
+✅ **Detailed Logging**: Console output shows all actions with timestamps and cooldowns
+✅ **Configurable**: Adjust AI difficulty, cooldown duration, and game parameters
+✅ **Educational**: Great for learning about game AI algorithms and simultaneous game design
 
 ## Performance Metrics
 
@@ -204,25 +263,41 @@ The project tracks:
 
 ```
 ============================================================
-SNOWBALL FIGHT: MINIMAX vs MCTS
+# MINIMAX vs MCTS
+# Both agents act simultaneously
 ============================================================
 
-Turn 1 - Player 1's Action
-====================================================
-P1: pos=[0, 2], HP=100, snowballs=5
-P2: pos=[9, 2], HP=100, snowballs=5
+STEP 1 (Turn 0)
+Turn 0 (Step 1)
+P1: pos=[5, 4], HP=100, snowballs=5, items={'freezeball': 1, 'medkit': 1}, frozen=0
+P2: pos=[5, 0], HP=100, snowballs=5, items={'freezeball': 1, 'medkit': 1}, frozen=0
 
-Action taken: MOVE_RIGHT (Time: 0.234s)
-Result: Player 1 moved right
+--- Both agents act simultaneously ---
+[Minimax-P1] THROW_SNOWBALL
+[MCTS-P2]    MOVE_LEFT
 
-[Minimax-P1] Nodes explored: 1847, Best score: 45.5, Action: MOVE_RIGHT
+P1: THROW_SNOWBALL -> P1 aimed STRAIGHT, threw 4.0! P2 HIT! -20 HP
+P2: MOVE_LEFT     -> Player 2 shifted LEFT
+HP: P1=100 | P2=80
+Attack Cooldowns: P1=2 | P2=0
+
+============================================================
+STEP 2 (Turn 1)
+--- Both agents act simultaneously ---
+[Minimax-P1] AIM (on cooldown)
+[MCTS-P2]    THROW_SNOWBALL
+
+P1: AIM            -> Player 1 aimed/waited
+P2: THROW_SNOWBALL -> P2 aimed STRAIGHT, threw 4.0! P1 dodged!
+HP: P1=100 | P2=80
+Attack Cooldowns: P1=1 | P2=2
 
 ...
 
 GAME OVER!
 WINNER: Player 1 (MINIMAX)
-Total turns: 18
-Total game time: 4.523 seconds
+Total steps: 145
+Final HP: P1=85, P2=0
 ```
 
 ## Troubleshooting

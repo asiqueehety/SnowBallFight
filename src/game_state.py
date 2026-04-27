@@ -36,12 +36,12 @@ class GameState:
     INITIAL_HP = 100
     MAX_TURNS = 200
     HIT_DAMAGE = 20
-    SNOWBALL_LIMIT = 5
-    THROW_ACCURACY_BASE = 0.7
+    SNOWBALL_LIMIT = 20
+    THROW_ACCURACY_BASE = 0.8
     MIN_DISTANCE = 1
     MAX_DISTANCE = 9
     MIN_THROW_FORCE = 0.5
-    MAX_THROW_FORCE = 1.5
+    MAX_THROW_FORCE = 2.0
 
     def __init__(self):
         self.player1_pos = [self.FIELD_WIDTH // 2, self.FIELD_HEIGHT - 1]
@@ -54,8 +54,8 @@ class GameState:
         self.player2_hp = self.INITIAL_HP
         self.player1_snowballs = self.SNOWBALL_LIMIT
         self.player2_snowballs = self.SNOWBALL_LIMIT
-        self.player1_items = {'freezeball': 1, 'medkit': 1}
-        self.player2_items = {'freezeball': 1, 'medkit': 1}
+        self.player1_items = {'freezeball': 0, 'medkit': 3}
+        self.player2_items = {'freezeball': 0, 'medkit': 3}
         self.player1_frozen = 0
         self.player2_frozen = 0
         # Tracks which player has a pending bonus turn (after using freezeball)
@@ -66,6 +66,9 @@ class GameState:
         self.is_game_over = False
         self.winner = None
         self.current_player_turn = 1
+        # Attack cooldown tracking (in steps)
+        self.player1_attack_cooldown = 0
+        self.player2_attack_cooldown = 0
 
     @property
     def current_turn(self):
@@ -166,6 +169,13 @@ class GameState:
             result['message'] = f"Player {player} is FROZEN! Can only AIM."
             return result
 
+        # Check attack cooldown
+        attack_cooldown = self.player1_attack_cooldown if player == 1 else self.player2_attack_cooldown
+        if action in [ActionType.THROW_SNOWBALL, ActionType.USE_FREEZEBALL] and attack_cooldown > 0:
+            result['success'] = False
+            result['message'] = f"Player {player} is on attack cooldown ({attack_cooldown} steps remaining)"
+            return result
+
         if action == ActionType.MOVE_LEFT:
             if pos[0] > 0:
                 pos[0] -= 1
@@ -252,6 +262,12 @@ class GameState:
                         result['message'] = (f"P{player} aimed {aim_dir}, threw {dist_str}! "
                                              f"P{opp_name} dodged it!")
                         result['dodge_type'] = 'passive'
+
+                # Apply attack cooldown
+                if player == 1:
+                    self.player1_attack_cooldown = 0
+                else:
+                    self.player2_attack_cooldown = 0
             else:
                 result['success'] = False
                 result['message'] = f"Player {player} has no snowballs left!"
@@ -273,6 +289,12 @@ class GameState:
                 result['freeze_applied'] = True
                 result['bonus_turn_granted'] = True
                 result['item_used'] = 'freezeball'
+
+                # Apply attack cooldown
+                if player == 1:
+                    self.player1_attack_cooldown = 2
+                else:
+                    self.player2_attack_cooldown = 2
             else:
                 result['success'] = False
                 result['message'] = f"Player {player} has no freezeball or opponent already frozen!"
@@ -362,6 +384,14 @@ class GameState:
 
     def advance_step(self):
         self.current_step += 1
+        self.update_cooldowns()
+
+    def update_cooldowns(self):
+        """Decrease attack cooldowns each step."""
+        if self.player1_attack_cooldown > 0:
+            self.player1_attack_cooldown -= 1
+        if self.player2_attack_cooldown > 0:
+            self.player2_attack_cooldown -= 1
 
     def advance_turn(self):
         self.player1_prev_pos = self.player1_pos.copy()
@@ -378,7 +408,7 @@ class GameState:
         return copy.deepcopy(self)
 
     def __str__(self) -> str:
-        bonus = f" [BONUS→P{self.pending_bonus_turn}]" if self.pending_bonus_turn else ""
+        bonus = f" [BONUS->P{self.pending_bonus_turn}]" if self.pending_bonus_turn else ""
         return (
             f"Turn {self.current_turn} (Step {self.current_step}){bonus}\n"
             f"P1: pos={self.player1_pos}, HP={self.player1_hp}, "

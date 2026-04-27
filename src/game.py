@@ -1,13 +1,7 @@
 """
-Main Game Logic
-Orchestrates the AI vs AI game with proper freeze/bonus-turn handling.
-
-Turn flow each round:
-  1. P1 acts normally
-     - If P1 used freezeball → pending_bonus_turn = 1
-       * P2's turn is SKIPPED (frozen, tick down)
-       * P1 gets BONUS TURN immediately
-  2. P2 acts normally (unless skipped due to freeze)
+Main Game Logic - Simultaneous Gameplay
+Both agents act at the same time each step.
+Attack cooldown: 2 steps between attacks.
 """
 
 from typing import Dict
@@ -34,82 +28,64 @@ class SnowballGame:
         self.game_log = []
         self.turn_history = []
 
-    # ── helpers ──────────────────────────────────────────────────
-
-    def _act(self, player_id: int, turn_num: int, tag: str = "") -> bool:
-        """Execute one action for player_id. Returns False if game ended."""
-        agent = self.agent1 if player_id == 1 else self.agent2
-        start = time.time()
-        action = agent.get_best_action(self.state)
-        t = time.time() - start
-        result = self.state.apply_action(player_id, action)
-
-        label = f"[{tag}]" if tag else ""
-        print(f"  P{player_id}{label}: {action.name:20s} -> {result['message']}  ({t:.3f}s)")
-
-        self.state.check_game_over()
-        self.turn_history.append({
-            'turn':      turn_num,
-            'player':    player_id,
-            'tag':       tag,
-            'action':    action.name,
-            'result':    result['message'],
-            'p1_hp':     self.state.player1_hp,
-            'p2_hp':     self.state.player2_hp,
-            'p1_frozen': self.state.player1_frozen,
-            'p2_frozen': self.state.player2_frozen,
-            'time':      t,
-        })
-        return not self.state.is_game_over
-
     def play_turn(self) -> bool:
-        """Play one full round (advance_turn + handle all actions incl. bonus turns)."""
+        """Play one step where both agents act simultaneously."""
         self.state.advance_turn()
         turn_num = self.state.current_turn
 
         print(f"\n{'='*60}")
-        print(f"TURN {turn_num}")
+        print(f"STEP {self.state.current_step} (Turn {turn_num})")
         print(self.state)
 
-        for player_id in [1, 2]:
-            if self.state.is_game_over:
-                return False
+        print("\n--- Both agents act simultaneously ---")
 
-            frozen = self.state.player1_frozen if player_id == 1 else self.state.player2_frozen
+        # Get actions from both agents
+        start_p1 = time.time()
+        action_p1 = self.agent1.get_best_action(self.state)
+        t_p1 = time.time() - start_p1
 
-            # ── SKIPPED: player is frozen (counter = 2 or 1) ──
-            if frozen > 0:
-                print(f"  P{player_id} FROZEN (turns left={frozen}) — SKIPPED!")
-                self.state.tick_frozen(player_id)
-                self.turn_history.append({
-                    'turn': turn_num, 'player': player_id, 'tag': 'FROZEN',
-                    'action': 'SKIPPED', 'result': f'Frozen ({frozen})',
-                    'time': 0, 'p1_hp': self.state.player1_hp,
-                    'p2_hp': self.state.player2_hp,
-                    'p1_frozen': self.state.player1_frozen,
-                    'p2_frozen': self.state.player2_frozen,
-                })
-                continue
+        start_p2 = time.time()
+        action_p2 = self.agent2.get_best_action(self.state)
+        t_p2 = time.time() - start_p2
 
-            # ── NORMAL ACTION ──
-            if not self._act(player_id, turn_num):
-                return False
+        # Apply both actions
+        result_p1 = self.state.apply_action(1, action_p1)
+        result_p2 = self.state.apply_action(2, action_p2)
 
-            # ── BONUS TURN: did this player just use a freezeball? ──
-            if self.state.pending_bonus_turn == player_id:
-                self.state.consume_bonus_turn(player_id)
-                opp = 2 if player_id == 1 else 1
-                print(f"  >>> P{player_id} BONUS TURN (P{opp} is frozen, {self.state.player2_frozen if player_id==1 else self.state.player1_frozen} turns left) <<<")
-                if self.state.is_game_over:
-                    return False
-                if not self._act(player_id, turn_num, tag="BONUS"):
-                    return False
+        print(f"  P1: {action_p1.name:20s} -> {result_p1['message']}  ({t_p1:.3f}s)")
+        print(f"  P2: {action_p2.name:20s} -> {result_p2['message']}  ({t_p2:.3f}s)")
 
-        return True
+        print(f"  HP: P1={self.state.player1_hp} | P2={self.state.player2_hp}")
+        if self.state.player1_attack_cooldown > 0 or self.state.player2_attack_cooldown > 0:
+            print(f"  Attack Cooldowns: P1={self.state.player1_attack_cooldown} | P2={self.state.player2_attack_cooldown}")
+
+        # Track history
+        self.turn_history.append({
+            'turn': turn_num,
+            'player': 1,
+            'action': action_p1.name,
+            'result': result_p1['message'],
+            'p1_hp': self.state.player1_hp,
+            'p2_hp': self.state.player2_hp,
+            'time': t_p1,
+        })
+        self.turn_history.append({
+            'turn': turn_num,
+            'player': 2,
+            'action': action_p2.name,
+            'result': result_p2['message'],
+            'p1_hp': self.state.player1_hp,
+            'p2_hp': self.state.player2_hp,
+            'time': t_p2,
+        })
+
+        # Check for game over
+        return not self.state.check_game_over()
 
     def play_full_game(self) -> Dict:
         print(f"\n{'#'*60}")
         print(f"# {self.agent1_type.upper()} vs {self.agent2_type.upper()}")
+        print(f"# Both agents act simultaneously")
         print(f"{'#'*60}\n")
 
         start = time.time()
@@ -125,7 +101,6 @@ class SnowballGame:
 
         return {
             'winner':             self.state.winner,
-            'turns':              self.state.current_turn,
             'steps':              self.state.current_step,
             'final_p1_hp':        self.state.player1_hp,
             'final_p2_hp':        self.state.player2_hp,

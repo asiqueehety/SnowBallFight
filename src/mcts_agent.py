@@ -58,7 +58,7 @@ class MCTSNode:
 
 
 class MCTSAgent:
-    def __init__(self, player_id: int, iterations: int = 500, exploration: float = 1.41):
+    def __init__(self, player_id: int, iterations: int = 3000, exploration: float = 1.41):
         self.player_id = player_id
         self.opponent_id = 2 if player_id == 1 else 1
         self.iterations = iterations
@@ -226,8 +226,17 @@ class MCTSAgent:
     def backpropagate(self, node: MCTSNode, reward: float):
         while node is not None:
             node.visits += 1
-            # Our nodes: add reward; opponent nodes: subtract (adversarial)
-            node.value += reward if node.player_id == self.player_id else -reward
+
+            # The root node has no parent, just track the baseline reward
+            if node.parent is None:
+                node.value += reward
+            # If the action that led to this node was made by US, we want a HIGH value for winning
+            elif node.parent.player_id == self.player_id:
+                node.value += reward
+            # If the action that led here was made by the OPPONENT, they want a HIGH value for beating us
+            else:
+                node.value -= reward
+
             node = node.parent
 
     def tree_policy(self, node: MCTSNode) -> MCTSNode:
