@@ -498,8 +498,8 @@ class CompleteGameGUI:
             self.screen.blit(bt, bt.get_rect(right=self.WINDOW_WIDTH - 18, top=hud_y + 126))
 
         # Centre
-        turn_txt = self.font_large.render(f"Turn: {state.current_turn}", True, self.YELLOW)
-        self.screen.blit(turn_txt, turn_txt.get_rect(center=(self.WINDOW_WIDTH // 2, hud_y + 22)))
+        # turn_txt = self.font_large.render(f"Turn: {state.current_turn}", True, self.YELLOW)
+        # self.screen.blit(turn_txt, turn_txt.get_rect(center=(self.WINDOW_WIDTH // 2, hud_y + 22)))
 
         # Phase label
         phase_label = self.anim_phase.replace("_", " ").upper()
