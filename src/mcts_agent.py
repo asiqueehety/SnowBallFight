@@ -58,7 +58,7 @@ class MCTSNode:
 
 
 class MCTSAgent:
-    def __init__(self, player_id: int, iterations: int = 3000, exploration: float = 1.41):
+    def __init__(self, player_id: int, iterations: int = 500, exploration: float = 1.41):
         self.player_id = player_id
         self.opponent_id = 2 if player_id == 1 else 1
         self.iterations = iterations
